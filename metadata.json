@@ -1,0 +1,6 @@
+{
+  "name": "艾宾浩斯英语单词背诵计划表",
+  "description": "基于艾宾浩斯遗忘曲线的初中英语单词复习计划、打卡表与定期测试系统，支持自动生成翻译、手动管理单词与多阶段复习提醒。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
