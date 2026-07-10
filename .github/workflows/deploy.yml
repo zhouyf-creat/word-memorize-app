@@ -1,0 +1,59 @@
+name: Build and Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - main # 触发分支，默认在您 push 到 main 分支时自动部署
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }} # Google Cloud 项目 ID (需在 GitHub Secrets 中配置)
+  SERVICE_NAME: ebbinghaus-english # 部署到 Cloud Run 后的服务名称
+  REGION: us-central1 # 部署的目标区域，可以改为 asia-east1 等
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 1. 认证 Google Cloud 凭据
+      # 提示：需在 GitHub Repository Settings -> Secrets and variables -> Actions 中配置 GCP_SA_KEY
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      # 2. 设置 Google Cloud SDK
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      # 3. 配置 Docker 认证以登录 Artifact Registry / Container Registry
+      - name: Configure Docker Client
+        run: |
+          gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      # 4. 构建并推送 Docker 镜像到 Artifact Registry
+      # 注意：部署前需要先在 GCP 控制台手动创建一个名为 "cloud-run-source-deploy" 的 Artifact Registry Docker 仓库
+      - name: Build and Push Container
+        run: |
+          IMAGE_TAG="us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/cloud-run-source-deploy/${{ env.SERVICE_NAME }}:${{ github.sha }}"
+          docker build -t "$IMAGE_TAG" .
+          docker push "$IMAGE_TAG"
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
+      # 5. 部署镜像至 Google Cloud Run
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          region: ${{ env.REGION }}
+          image: us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/cloud-run-source-deploy/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          # 传入必要环境变量，如 Gemini 接口密钥（需要在 GitHub Secrets 中配置 GEMINI_API_KEY）
+          env_vars: |
+            NODE_ENV=production
+            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+          flags: '--allow-unauthenticated --port=3000'
