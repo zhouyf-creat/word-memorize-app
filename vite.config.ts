@@ -4,7 +4,6 @@ import path from 'path';
 import {defineConfig} from 'vite';
 export default defineConfig(() => {
   return {
-    base: '/word-memorize-app/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
